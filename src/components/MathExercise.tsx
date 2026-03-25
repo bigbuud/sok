@@ -2,6 +2,15 @@ import { useState, useCallback } from 'react';
 import { generateProblem, generateChoices, type ExerciseType, type MathProblem } from '@/lib/exercises';
 import ScoreDisplay from './ScoreDisplay';
 import SokVisualization from './SokVisualization';
+import { useSound } from '@/hooks/useSound';
+
+const MOTIVATIONS = [
+  'Probeer nog eens! 💪',
+  'Bijna! Je kan het! 🌟',
+  'Niet erg, nog een keer! 😊',
+  'Oeps! Probeer het opnieuw! 🦸',
+  'Blijf proberen, je bent super! 🚀',
+];
 
 interface MathExerciseProps {
   type: ExerciseType;
@@ -14,6 +23,8 @@ const MathExercise = ({ type }: MathExerciseProps) => {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [total, setTotal] = useState(0);
+  const [motivation, setMotivation] = useState('');
+  const { playCorrect, playWrong } = useSound();
 
   const handleAnswer = useCallback((choice: number) => {
     if (feedback !== null) return;
@@ -21,7 +32,13 @@ const MathExercise = ({ type }: MathExerciseProps) => {
     const isCorrect = choice === problem.answer;
     setFeedback(isCorrect ? 'correct' : 'wrong');
     setTotal(t => t + 1);
-    if (isCorrect) setScore(s => s + 1);
+    if (isCorrect) {
+      setScore(s => s + 1);
+      playCorrect();
+    } else {
+      playWrong();
+      setMotivation(MOTIVATIONS[Math.floor(Math.random() * MOTIVATIONS.length)]);
+    }
 
     setTimeout(() => {
       const newProblem = generateProblem(type);
@@ -29,8 +46,9 @@ const MathExercise = ({ type }: MathExerciseProps) => {
       setChoices(generateChoices(newProblem.answer));
       setFeedback(null);
       setSelectedAnswer(null);
-    }, 1500);
-  }, [feedback, problem.answer, type]);
+      setMotivation('');
+    }, 2000);
+  }, [feedback, problem.answer, type, playCorrect, playWrong]);
 
   const choiceColors = [
     'bg-fun-blue text-primary-foreground hover:bg-fun-blue/80',
@@ -87,8 +105,13 @@ const MathExercise = ({ type }: MathExerciseProps) => {
         <div className="text-4xl star-burst">🎉</div>
       )}
       {feedback === 'wrong' && (
-        <div className="text-2xl font-display text-destructive animate-bounce-in">
-          Het was {problem.answer}!
+        <div className="flex flex-col items-center gap-1 animate-bounce-in">
+          <div className="text-2xl font-display text-destructive">
+            Het antwoord was {problem.answer}!
+          </div>
+          <div className="text-xl font-display text-primary">
+            {motivation}
+          </div>
         </div>
       )}
     </div>
