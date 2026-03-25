@@ -4,8 +4,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies using npm ci (deterministic install)
-RUN npm ci
+# Install dependencies
+RUN npm install
 
 # Copy application files
 COPY . .
