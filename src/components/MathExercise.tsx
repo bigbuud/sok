@@ -102,15 +102,19 @@ const MathExercise = ({ type }: MathExerciseProps) => {
       </div>
 
       {feedback === 'correct' && (
-        <div className="text-4xl star-burst">🎉</div>
+        <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-50">
+          <div className="bg-success/90 text-white rounded-3xl px-10 py-6 shadow-2xl flex flex-col items-center gap-2 animate-bounce-in">
+            <div className="text-6xl">🎉</div>
+            <div className="text-3xl font-display">Super goed!</div>
+          </div>
+        </div>
       )}
       {feedback === 'wrong' && (
-        <div className="flex flex-col items-center gap-1 animate-bounce-in">
-          <div className="text-2xl font-display text-destructive">
-            Het antwoord was {problem.answer}!
-          </div>
-          <div className="text-xl font-display text-primary">
-            {motivation}
+        <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-50">
+          <div className="bg-fun-orange/95 text-white rounded-3xl px-10 py-6 shadow-2xl flex flex-col items-center gap-2 animate-bounce-in">
+            <div className="text-5xl">😅</div>
+            <div className="text-2xl font-display">Het was {problem.answer}!</div>
+            <div className="text-xl font-display">{motivation}</div>
           </div>
         </div>
       )}
