@@ -1,0 +1,44 @@
+import { useParams, useNavigate } from 'react-router-dom';
+import { exercises, type ExerciseType } from '@/lib/exercises';
+import MathExercise from '@/components/MathExercise';
+import NumberBuildingExercise from '@/components/NumberBuildingExercise';
+import { ArrowLeft } from 'lucide-react';
+
+const ExercisePage = () => {
+  const { type } = useParams<{ type: string }>();
+  const navigate = useNavigate();
+  const config = exercises.find(e => e.type === type);
+
+  if (!config) {
+    navigate('/');
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-background px-4 py-6">
+      <div className="max-w-lg mx-auto">
+        <button
+          onClick={() => navigate('/')}
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4 font-body font-bold"
+        >
+          <ArrowLeft size={20} />
+          Terug
+        </button>
+
+        <div className="text-center mb-6">
+          <span className="text-4xl mb-2 block">{config.emoji}</span>
+          <h1 className="text-2xl text-foreground">{config.title}</h1>
+          <p className="text-muted-foreground font-body">{config.description}</p>
+        </div>
+
+        {config.type === 'number-building' ? (
+          <NumberBuildingExercise />
+        ) : (
+          <MathExercise type={config.type as ExerciseType} />
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ExercisePage;
