@@ -203,6 +203,10 @@ export default function StepExercise({ type }: StepExerciseProps) {
           const isActive = idx === currentStep && !allDone;
           const isPending = !isCompleted && !isActive;
 
+          // Don't reveal future steps at all — kids would see the next equation
+          // and deduce the intermediate answer before solving it themselves.
+          if (isPending) return null;
+
           // Ring colour for active card
           const activeRing =
             stepFeedback === 'wrong'
@@ -217,9 +221,7 @@ export default function StepExercise({ type }: StepExerciseProps) {
               className={`rounded-2xl p-4 transition-all duration-200 ${
                 isCompleted
                   ? 'bg-success/10 ring-2 ring-success/40'
-                  : isActive
-                  ? `bg-card shadow-lg ring-2 ${activeRing}`
-                  : 'bg-muted/40 opacity-40'
+                  : `bg-card shadow-lg ring-2 ${activeRing}`
               }`}
             >
               {/* Equation row */}
