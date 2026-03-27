@@ -1,13 +1,13 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { exercises, type ExerciseType } from '@/lib/exercises';
-import MathExercise from '@/components/MathExercise';
+import StepExercise from '@/components/StepExercise';
 import NumberBuildingExercise from '@/components/NumberBuildingExercise';
 import { ArrowLeft } from 'lucide-react';
 
 const ExercisePage = () => {
   const { type } = useParams<{ type: string }>();
   const navigate = useNavigate();
-  const config = exercises.find(e => e.type === type);
+  const config = exercises.find((e) => e.type === type);
 
   if (!config) {
     navigate('/');
@@ -34,7 +34,7 @@ const ExercisePage = () => {
         {config.type === 'number-building' ? (
           <NumberBuildingExercise />
         ) : (
-          <MathExercise type={config.type as ExerciseType} />
+          <StepExercise type={config.type as ExerciseType} />
         )}
       </div>
     </div>
