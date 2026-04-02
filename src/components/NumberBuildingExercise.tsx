@@ -25,15 +25,19 @@ const TenRod = ({ active, dimmed, onClick }: {
       <div
         key={i}
         style={{
-          width: 22,
-          height: 22,
+          width: 20,
+          height: 20,
           background: active
             ? 'hsl(210 90% 56%)'
-            : 'hsl(210 60% 88%)',
-          border: '1.5px solid hsl(210 70% 72%)',
-          borderBottom: i < 9 ? '1px solid hsl(210 70% 72%)' : '1.5px solid hsl(210 70% 72%)',
+            : 'hsl(210 55% 90%)',
+          border: '2px solid hsl(210 60% 42%)',
+          marginBottom: i < 9 ? 1 : 0,
           boxSizing: 'border-box',
           transition: 'background 0.2s',
+          boxShadow: active
+            ? 'inset 1px 1px 0 hsla(0,0%,100%,0.35), inset -1px -1px 0 hsla(210,80%,30%,0.2)'
+            : 'inset 1px 1px 0 hsla(0,0%,100%,0.6)',
+          borderRadius: 2,
         }}
       />
     ))}
@@ -54,14 +58,18 @@ const UnitCube = ({ active, dimmed, onClick }: {
       ${dimmed ? 'opacity-20' : ''}
     `}
     style={{
-      width: 22,
-      height: 22,
+      width: 20,
+      height: 20,
       background: active
         ? 'hsl(25 95% 58%)'
-        : 'hsl(25 70% 88%)',
-      border: '1.5px solid hsl(25 80% 70%)',
+        : 'hsl(25 65% 90%)',
+      border: '2px solid hsl(25 75% 42%)',
       boxSizing: 'border-box',
       transition: 'background 0.2s',
+      boxShadow: active
+        ? 'inset 1px 1px 0 hsla(0,0%,100%,0.4), inset -1px -1px 0 hsla(25,80%,30%,0.2)'
+        : 'inset 1px 1px 0 hsla(0,0%,100%,0.7)',
+      borderRadius: 2,
     }}
     aria-label="eenheid"
   />
@@ -248,16 +256,11 @@ export default function NumberBuildingExercise() {
           <>
             <p className="text-muted-foreground font-body mb-1 text-sm">Bouw dit getal met blokken:</p>
             <p className="text-7xl font-display text-primary mb-2">{problem.number}</p>
-            <div className="flex justify-center gap-4 text-sm font-body text-muted-foreground">
-              <span className="text-fun-blue font-bold">{problem.tens} tiental{problem.tens !== 1 ? 'len' : ''}</span>
-              <span>+</span>
-              <span className="text-fun-orange font-bold">{problem.ones} eenhed{problem.ones !== 1 ? 'en' : ''}</span>
-            </div>
           </>
         ) : (
           <>
             <p className="text-muted-foreground font-body mb-4 text-sm">Welk getal zie je hier?</p>
-            <div className="min-h-[120px] flex items-end justify-center">
+            <div className="min-h-[230px] flex items-end justify-center">
               <BlockDisplay tens={problem.tens} ones={problem.ones} />
             </div>
           </>
