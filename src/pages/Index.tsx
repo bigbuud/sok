@@ -49,19 +49,16 @@ function MasteryBar({ type }: { type: string }) {
 
 // ─── Exercise card ────────────────────────────────────────────────────────────
 
-function ExerciseCard({ ex, onClick, locked }: { ex: ExerciseConfig; onClick: () => void; locked: boolean }) {
+function ExerciseCard({ ex, onClick }: { ex: ExerciseConfig; onClick: () => void }) {
   return (
-    <button onClick={locked ? undefined : onClick}
-      className={`exercise-card ${ex.bgClass} text-left w-full relative overflow-hidden ${
-        locked ? 'opacity-50 cursor-default' : ''}`}>
+    <button onClick={onClick}
+      className={`exercise-card ${ex.bgClass} text-left w-full relative overflow-hidden`}>
       <div className="flex items-center gap-4">
-        <span className="text-4xl">{locked ? '🔒' : ex.emoji}</span>
+        <span className="text-4xl">{ex.emoji}</span>
         <div className="flex-1 min-w-0">
           <h2 className={`text-xl font-display ${ex.colorClass}`}>{ex.title}</h2>
-          <p className="text-muted-foreground font-body text-sm">
-            {locked ? 'Oefen de vorige oefeningen eerst!' : ex.description}
-          </p>
-          {!locked && <MasteryBar type={ex.type} />}
+          <p className="text-muted-foreground font-body text-sm">{ex.description}</p>
+          <MasteryBar type={ex.type} />
         </div>
       </div>
     </button>
@@ -165,7 +162,6 @@ export default function Index() {
                 <div className="grid gap-3">
                   {sectionExercises.map(ex => (
                     <ExerciseCard key={ex.type} ex={ex}
-                      locked={!isUnlocked(ex.type)}
                       onClick={() => navigate(`/oefening/${ex.type}`)} />
                   ))}
                 </div>
