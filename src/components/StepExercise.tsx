@@ -44,13 +44,15 @@ function buildJumps(problem: StepProblem): Jump[] | null {
 }
 
 function lineRange(problem: StepProblem): [number, number] {
-  const nums = [problem.a, problem.b, problem.finalAnswer,
-    ...problem.steps.flatMap(s => [s.a, s.result])];
+  // Only use the actual jump endpoints — NOT problem.b which is an operand, not a position
+  const nums = problem.steps.flatMap(s => [s.a, s.result]);
   const mn = Math.min(...nums);
   const mx = Math.max(...nums);
-  const pad = Math.max(2, Math.ceil((mx - mn) * 0.1));
-  return [Math.max(0, Math.floor((mn - pad) / 5) * 5),
-          Math.min(100, Math.ceil((mx + pad) / 5) * 5)];
+  const pad = Math.max(2, Math.ceil((mx - mn) * 0.2));
+  return [
+    Math.max(0,   Math.floor((mn - pad) / 5) * 5),
+    Math.min(100, Math.ceil((mx  + pad) / 5) * 5),
+  ];
 }
 
 // ─── Visualisation panel ──────────────────────────────────────────────────────
