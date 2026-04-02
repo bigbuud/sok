@@ -62,8 +62,13 @@ export function loadProgress(): AppProgress {
 }
 
 export function saveProgress(p: AppProgress): void {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch {}
+  try { 
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); 
+  } catch {
+    // Silently fail if localStorage is unavailable (private browsing, quota exceeded, etc.)
+  }
 }
+
 
 // ─── Recording answers ────────────────────────────────────────────────────────
 
