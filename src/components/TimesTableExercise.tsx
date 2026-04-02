@@ -69,17 +69,20 @@ const TIMER_SECONDS = 10;
 
 // ─── Setup screen ─────────────────────────────────────────────────────────────
 
+const SESSION_OPTIONS = [5, 10, 15, 20];
+
 interface SetupProps {
   initialTables: number[];
   initialMode: Mode;
   initialTimer: boolean;
-  onStart: (tables: number[], mode: Mode, timer: boolean) => void;
+  onStart: (tables: number[], mode: Mode, timer: boolean, sessionTotal: number) => void;
 }
 
 const SetupScreen = ({ initialTables, initialMode, initialTimer, onStart }: SetupProps) => {
   const [selected, setSelected] = useState<number[]>(initialTables);
   const [mode, setMode] = useState<Mode>(initialMode);
   const [timerOn, setTimerOn] = useState(initialTimer);
+  const [sessionTotal, setSessionTotal] = useState(10);
 
   const toggle = (n: number) =>
     setSelected(prev => prev.includes(n) ? prev.filter(x => x !== n) : [...prev, n]);
@@ -123,6 +126,20 @@ const SetupScreen = ({ initialTables, initialMode, initialTimer, onStart }: Setu
         )}
       </div>
 
+      {/* Session count */}
+      <div className="bg-card rounded-2xl p-5 shadow w-full">
+        <p className="font-bold font-body text-foreground mb-3">Hoeveel sommen?</p>
+        <div className="grid grid-cols-4 gap-2">
+          {SESSION_OPTIONS.map(n => (
+            <button key={n} onClick={() => setSessionTotal(n)}
+              className={`h-12 rounded-xl font-bold text-lg font-display transition-all hover:scale-105 active:scale-95 ${
+                sessionTotal === n ? 'bg-primary text-white shadow-md scale-105' : 'bg-muted text-muted-foreground'}`}>
+              {n}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Timer toggle */}
       <div className="bg-card rounded-2xl p-4 shadow w-full">
         <div className="flex items-center justify-between">
@@ -142,7 +159,7 @@ const SetupScreen = ({ initialTables, initialMode, initialTimer, onStart }: Setu
         </div>
       </div>
 
-      <button onClick={() => onStart(selected, mode, timerOn)} disabled={selected.length === 0}
+      <button onClick={() => onStart(selected, mode, timerOn, sessionTotal)} disabled={selected.length === 0}
         className="w-full py-4 rounded-2xl font-bold text-xl bg-primary text-white hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0">
         Start! 🚀
       </button>
@@ -156,10 +173,12 @@ interface ExerciseProps {
   tables: number[];
   mode: Mode;
   timerOn: boolean;
+  sessionTotal: number;
   onBack: () => void;
+  onDone: (correct: number, total: number) => void;
 }
 
-const ExerciseScreen = ({ tables, mode, timerOn, onBack }: ExerciseProps) => {
+const ExerciseScreen = ({ tables, mode, timerOn, sessionTotal, onBack, onDone }: ExerciseProps) => {
   const weakFacts = getWeakFacts(mode);
   const [problem, setProblem] = useState<Problem>(() => generateProblem(tables, mode, weakFacts));
   const [choices, setChoices] = useState<number[]>(() => generateChoices(problem.answer));
@@ -174,7 +193,11 @@ const ExerciseScreen = ({ tables, mode, timerOn, onBack }: ExerciseProps) => {
   const { playCorrect, playWrong } = useSound();
   const { streak, newBadge, clearBadge, record } = useStreakBadges(mode);
 
-  const nextProblem = useCallback(() => {
+  const nextProblem = useCallback((currentScore: number, currentTotal: number) => {
+    if (currentTotal >= sessionTotal) {
+      onDone(currentScore, currentTotal);
+      return;
+    }
     const next = generateProblem(tables, mode, getWeakFacts(mode));
     setProblem(next);
     setChoices(generateChoices(next.answer));
@@ -182,7 +205,7 @@ const ExerciseScreen = ({ tables, mode, timerOn, onBack }: ExerciseProps) => {
     setSelectedAnswer(null);
     setMotivation('');
     setTimeLeft(TIMER_SECONDS);
-  }, [tables, mode]);
+  }, [tables, mode, sessionTotal, onDone]);
 
   // Timer logic
   useEffect(() => {
@@ -192,13 +215,11 @@ const ExerciseScreen = ({ tables, mode, timerOn, onBack }: ExerciseProps) => {
       setTimeLeft(t => {
         if (t <= 1) {
           clearInterval(timerRef.current!);
-          // Time's up — count as wrong
           playWrong();
           setFeedback('wrong');
           setMotivation('Tijd is op! ⏰');
           record(problem.a, problem.b, '×', false);
-          setTotal(n => n + 1);
-          setTimeout(nextProblem, 1800);
+          setTotal(n => { setTimeout(() => nextProblem(score, n + 1), 1800); return n + 1; });
           return 0;
         }
         return t - 1;
@@ -213,17 +234,20 @@ const ExerciseScreen = ({ tables, mode, timerOn, onBack }: ExerciseProps) => {
     setSelectedAnswer(choice);
     const isCorrect = choice === problem.answer;
     setFeedback(isCorrect ? 'correct' : 'wrong');
-    setTotal(t => t + 1);
+    const newScore = isCorrect ? score + 1 : score;
+    const newTotal = total + 1;
     if (isCorrect) {
-      setScore(s => s + 1);
+      setScore(newScore);
       playCorrect();
     } else {
       playWrong();
       setMotivation(MOTIVATIONS[Math.floor(Math.random() * MOTIVATIONS.length)]);
     }
+    setTotal(newTotal);
     record(problem.a, problem.b, mode === 'vermenigvuldigen' ? '×' : '÷', isCorrect);
-    setTimeout(nextProblem, 1800);
-  }, [feedback, problem, mode, playCorrect, playWrong, nextProblem, record]);
+    setTimeout(() => nextProblem(newScore, newTotal), 1800);
+  }, [feedback, problem, mode, score, total, playCorrect, playWrong, nextProblem, record]);
+
 
   const choiceColors = [
     'bg-fun-blue text-white hover:bg-fun-blue/80',
@@ -335,23 +359,74 @@ const ExerciseScreen = ({ tables, mode, timerOn, onBack }: ExerciseProps) => {
   );
 };
 
+// ─── End screen ──────────────────────────────────────────────────────────────
+
+function endMessage(correct: number, total: number) {
+  const pct = correct / total;
+  if (pct === 1)  return { emoji: '🏆', text: 'Perfecte score! Jij bent een rekenraket!' };
+  if (pct >= 0.8) return { emoji: '🚀', text: 'Waanzinnig goed gedaan!' };
+  if (pct >= 0.6) return { emoji: '⭐', text: 'Super bezig, blijf zo doorgaan!' };
+  if (pct >= 0.4) return { emoji: '💪', text: 'Goed geprobeerd! Oefening baart kunst!' };
+  return           { emoji: '😊', text: 'Volgende keer gaat het nóg beter!' };
+}
+
+const EndScreen = ({ correct, total, onRestart }: {
+  correct: number; total: number; onRestart: () => void;
+}) => {
+  const { emoji, text } = endMessage(correct, total);
+  return (
+    <div className="flex flex-col items-center gap-6 py-4">
+      <div className="text-center">
+        <div className="text-7xl mb-2">{emoji}</div>
+        <h2 className="text-3xl font-display text-foreground mb-1">{text}</h2>
+        <p className="text-muted-foreground font-body text-lg">
+          {correct} van de {total} sommen goed!
+        </p>
+      </div>
+      <div className="flex flex-wrap justify-center gap-2 max-w-sm">
+        {Array.from({ length: total }, (_, i) => (
+          <span key={i} className="text-3xl">{i < correct ? '⭐' : '😅'}</span>
+        ))}
+      </div>
+      <button onClick={onRestart}
+        className="mt-2 rounded-2xl px-8 py-4 text-xl font-display bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-all shadow-lg">
+        Nog een keer! 🚀
+      </button>
+    </div>
+  );
+};
+
 // ─── Main wrapper ─────────────────────────────────────────────────────────────
 
 export default function TimesTableExercise({ initialMode = 'vermenigvuldigen' }: { initialMode?: Mode }) {
-  const [phase, setPhase] = useState<'setup' | 'exercise'>('setup');
+  const [phase, setPhase] = useState<'setup' | 'exercise' | 'end'>('setup');
   const [tables, setTables] = useState<number[]>([2, 3, 4, 5]);
   const [mode, setMode] = useState<Mode>(initialMode);
   const [timerOn, setTimerOn] = useState(false);
+  const [sessionTotal, setSessionTotal] = useState(10);
+  const [finalCorrect, setFinalCorrect] = useState(0);
+  const [finalTotal, setFinalTotal] = useState(0);
 
-  const handleStart = (t: number[], m: Mode, timer: boolean) => {
-    setTables(t); setMode(m); setTimerOn(timer); setPhase('exercise');
+  const handleStart = (t: number[], m: Mode, timer: boolean, total: number) => {
+    setTables(t); setMode(m); setTimerOn(timer); setSessionTotal(total); setPhase('exercise');
+  };
+
+  const handleDone = (correct: number, total: number) => {
+    setFinalCorrect(correct); setFinalTotal(total); setPhase('end');
   };
 
   return (
     <div className="flex flex-col items-center gap-6">
-      {phase === 'setup'
-        ? <SetupScreen initialTables={tables} initialMode={mode} initialTimer={timerOn} onStart={handleStart} />
-        : <ExerciseScreen tables={tables} mode={mode} timerOn={timerOn} onBack={() => setPhase('setup')} />}
+      {phase === 'setup' && (
+        <SetupScreen initialTables={tables} initialMode={mode} initialTimer={timerOn} onStart={handleStart} />
+      )}
+      {phase === 'exercise' && (
+        <ExerciseScreen tables={tables} mode={mode} timerOn={timerOn} sessionTotal={sessionTotal}
+          onBack={() => setPhase('setup')} onDone={handleDone} />
+      )}
+      {phase === 'end' && (
+        <EndScreen correct={finalCorrect} total={finalTotal} onRestart={() => setPhase('setup')} />
+      )}
     </div>
   );
 }
