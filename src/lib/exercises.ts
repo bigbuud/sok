@@ -6,7 +6,9 @@ export type ExerciseType =
   | 'te-min-e-brug'
   | 't-min-te'
   | 'te-plus-te'
-  | 'te-min-te';
+  | 'te-min-te'
+  | 'vermenigvuldigen'
+  | 'delen';
 
 export interface ExerciseConfig {
   type: ExerciseType;
@@ -81,6 +83,22 @@ export const exercises: ExerciseConfig[] = [
     emoji: '🌟',
     colorClass: 'text-fun-green',
     bgClass: 'bg-fun-green/10',
+  },
+  {
+    type: 'vermenigvuldigen',
+    title: 'Vermenigvuldigen',
+    description: 'Oefen de tafels van 1 tot 10',
+    emoji: '✖️',
+    colorClass: 'text-primary',
+    bgClass: 'bg-primary/10',
+  },
+  {
+    type: 'delen',
+    title: 'Delen',
+    description: 'Oefen delingen met de tafels',
+    emoji: '➗',
+    colorClass: 'text-fun-pink',
+    bgClass: 'bg-fun-pink/10',
   },
 ];
 
