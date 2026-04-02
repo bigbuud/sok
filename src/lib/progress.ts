@@ -62,13 +62,8 @@ export function loadProgress(): AppProgress {
 }
 
 export function saveProgress(p: AppProgress): void {
-  try { 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); 
-  } catch {
-    // Silently fail if localStorage is unavailable (private browsing, quota exceeded, etc.)
-  }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch {}
 }
-
 
 // ─── Recording answers ────────────────────────────────────────────────────────
 
@@ -139,19 +134,8 @@ export function checkNewBadges(
 
 // ─── Progression ─────────────────────────────────────────────────────────────
 
-export function isUnlocked(type: string): boolean {
-  const tierIdx = TIERS.findIndex(t => t.includes(type));
-  if (tierIdx <= 0) return true;
-  const prevTier = TIERS[tierIdx - 1];
-  const p = loadProgress();
-  const combined = prevTier.reduce(
-    (acc, t) => {
-      const s = p.stats[t];
-      return { correct: acc.correct + (s?.correct ?? 0), total: acc.total + (s?.total ?? 0) };
-    },
-    { correct: 0, total: 0 },
-  );
-  return combined.total >= 10 && combined.correct / combined.total >= 0.6;
+export function isUnlocked(_type: string): boolean {
+  return true;
 }
 
 export function tierProgress(type: string): { correct: number; needed: number } {
