@@ -8,7 +8,8 @@ export type ExerciseType =
   | 'te-plus-te'
   | 'te-min-te'
   | 'vermenigvuldigen'
-  | 'delen';
+  | 'delen'
+  | 'cijferen';
 
 export interface ExerciseConfig {
   type: ExerciseType;
@@ -83,6 +84,14 @@ export const exercises: ExerciseConfig[] = [
     emoji: '🌟',
     colorClass: 'text-fun-green',
     bgClass: 'bg-fun-green/10',
+  },
+  {
+    type: 'cijferen',
+    title: 'Cijferen',
+    description: 'Optellen, aftrekken, × en staartdelen stap voor stap',
+    emoji: '📐',
+    colorClass: 'text-fun-blue',
+    bgClass: 'bg-fun-blue/10',
   },
   {
     type: 'vermenigvuldigen',
