@@ -13,11 +13,19 @@ export interface ExerciseStat {
   wrongFacts: WrongFact[];
 }
 
-export interface AppProgress {
+export interface Profile {
+  id: string;
+  name: string;
   avatar: string;
   badges: string[];
   totalCorrect: number;
   stats: Record<string, ExerciseStat>;
+}
+
+export interface AppState {
+  activeProfileId: string;
+  profiles: Profile[];
+  hintsEnabled: boolean;
 }
 
 // ─── Badge definitions ────────────────────────────────────────────────────────
@@ -42,33 +50,153 @@ const TIERS: string[][] = [
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'rekenmeester-v1';
+const STORAGE_KEY = 'rekenmeester-v2';
 
-const DEFAULT: AppProgress = {
-  avatar: '🦊',
-  badges: [],
-  totalCorrect: 0,
-  stats: {},
+function makeProfile(name: string, avatar: string): Profile {
+  return {
+    id: `profile-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name,
+    avatar,
+    badges: [],
+    totalCorrect: 0,
+    stats: {},
+  };
+}
+
+const DEFAULT_STATE: AppState = {
+  activeProfileId: '',
+  profiles: [],
+  hintsEnabled: true,
 };
 
-export function loadProgress(): AppProgress {
+export function loadState(): AppState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return structuredClone(DEFAULT);
-    return { ...structuredClone(DEFAULT), ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw) as AppState;
+      if (parsed.profiles && parsed.profiles.length > 0) return parsed;
+    }
+    // Try migrating from v1
+    const oldRaw = localStorage.getItem('rekenmeester-v1');
+    if (oldRaw) {
+      const old = JSON.parse(oldRaw);
+      const migratedProfile = makeProfile('Speler 1', old.avatar ?? '🦊');
+      migratedProfile.badges = old.badges ?? [];
+      migratedProfile.totalCorrect = old.totalCorrect ?? 0;
+      migratedProfile.stats = old.stats ?? {};
+      const state: AppState = {
+        activeProfileId: migratedProfile.id,
+        profiles: [migratedProfile],
+        hintsEnabled: true,
+      };
+      saveState(state);
+      return state;
+    }
+    // Brand new install: create a default profile
+    const defaultProfile = makeProfile('Speler 1', '🦊');
+    const state: AppState = {
+      activeProfileId: defaultProfile.id,
+      profiles: [defaultProfile],
+      hintsEnabled: true,
+    };
+    saveState(state);
+    return state;
   } catch {
-    return structuredClone(DEFAULT);
+    const defaultProfile = makeProfile('Speler 1', '🦊');
+    return {
+      activeProfileId: defaultProfile.id,
+      profiles: [defaultProfile],
+      hintsEnabled: true,
+    };
   }
+}
+
+export function saveState(state: AppState): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Silently fail
+  }
+}
+
+// ─── Active profile helpers ───────────────────────────────────────────────────
+
+export function getActiveProfile(): Profile {
+  const state = loadState();
+  return state.profiles.find(p => p.id === state.activeProfileId) ?? state.profiles[0];
+}
+
+export function switchProfile(id: string): void {
+  const state = loadState();
+  if (state.profiles.find(p => p.id === id)) {
+    state.activeProfileId = id;
+    saveState(state);
+  }
+}
+
+export function createProfile(name: string, avatar: string): Profile {
+  const state = loadState();
+  const profile = makeProfile(name, avatar);
+  state.profiles.push(profile);
+  state.activeProfileId = profile.id;
+  saveState(state);
+  return profile;
+}
+
+export function deleteProfile(id: string): void {
+  const state = loadState();
+  if (state.profiles.length <= 1) return; // keep at least one
+  state.profiles = state.profiles.filter(p => p.id !== id);
+  if (state.activeProfileId === id) {
+    state.activeProfileId = state.profiles[0].id;
+  }
+  saveState(state);
+}
+
+export function updateActiveProfile(updater: (p: Profile) => void): void {
+  const state = loadState();
+  const profile = state.profiles.find(p => p.id === state.activeProfileId);
+  if (profile) {
+    updater(profile);
+    saveState(state);
+  }
+}
+
+// ─── Hints setting ────────────────────────────────────────────────────────────
+
+export function getHintsEnabled(): boolean {
+  return loadState().hintsEnabled;
+}
+
+export function setHintsEnabled(enabled: boolean): void {
+  const state = loadState();
+  state.hintsEnabled = enabled;
+  saveState(state);
+}
+
+// ─── Legacy compatibility (used by exercises) ─────────────────────────────────
+
+/** @deprecated Use loadState / getActiveProfile instead */
+export interface AppProgress {
+  avatar: string;
+  badges: string[];
+  totalCorrect: number;
+  stats: Record<string, ExerciseStat>;
+}
+
+export function loadProgress(): AppProgress {
+  const p = getActiveProfile();
+  return { avatar: p.avatar, badges: p.badges, totalCorrect: p.totalCorrect, stats: p.stats };
 }
 
 export function saveProgress(p: AppProgress): void {
-  try { 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); 
-  } catch {
-    // Silently fail if localStorage is unavailable (private browsing, quota exceeded, etc.)
-  }
+  updateActiveProfile(profile => {
+    profile.avatar = p.avatar;
+    profile.badges = p.badges;
+    profile.totalCorrect = p.totalCorrect;
+    profile.stats = p.stats;
+  });
 }
-
 
 // ─── Recording answers ────────────────────────────────────────────────────────
 
@@ -85,7 +213,6 @@ export function recordAnswer(
   if (correct) {
     p.stats[type].correct += 1;
     p.totalCorrect += 1;
-    // Heal wrong facts
     const wf = p.stats[type].wrongFacts.find(w => w.a === a && w.b === b);
     if (wf) wf.count = Math.max(0, wf.count - 1);
   } else {
@@ -107,10 +234,14 @@ export function getStat(type: string): ExerciseStat {
   return p.stats[type] ?? { correct: 0, total: 0, wrongFacts: [] };
 }
 
+export function getStatForProfile(profileId: string, type: string): ExerciseStat {
+  const state = loadState();
+  const p = state.profiles.find(pr => pr.id === profileId);
+  return p?.stats[type] ?? { correct: 0, total: 0, wrongFacts: [] };
+}
+
 export function setAvatar(emoji: string): void {
-  const p = loadProgress();
-  p.avatar = emoji;
-  saveProgress(p);
+  updateActiveProfile(p => { p.avatar = emoji; });
 }
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
@@ -155,6 +286,6 @@ export function tierProgress(type: string): { correct: number; needed: number } 
     },
     { correct: 0, total: 0 },
   );
-  const neededCorrect = Math.ceil(10 * 0.6); // 6 correct out of 10 minimum
+  const neededCorrect = Math.ceil(10 * 0.6);
   return { correct: Math.min(combined.correct, neededCorrect), needed: neededCorrect };
 }
