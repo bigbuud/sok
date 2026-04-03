@@ -70,6 +70,8 @@ function ExerciseCard({ ex, onClick }: { ex: ExerciseConfig; onClick: () => void
 const SECTIONS = [
   { label: '➕➖ Optellen & Aftrekken',
     types: ['number-building','e-plus-e-brug','t-min-e-brug','te-plus-e-brug','te-min-e-brug','t-min-te','te-plus-te','te-min-te'] },
+  { label: '📐 Cijferen (kolomsgewijs)',
+    types: ['cijferen'] },
   { label: '✖️➗ Vermenigvuldigen & Delen',
     types: ['vermenigvuldigen','delen'] },
 ];
