@@ -279,6 +279,23 @@ const ExerciseScreen = ({ tables, mode, timerOn, sessionTotal, onBack, onDone }:
         </div>
       </div>
 
+      {/* Session progress bar */}
+      <div className="w-full max-w-md">
+        <div className="flex justify-between text-xs font-body text-muted-foreground mb-1.5">
+          <span>Som {Math.min(total + 1, sessionTotal)} van {sessionTotal}</span>
+          <span>{score} ⭐</span>
+        </div>
+        <div className="flex gap-1">
+          {Array.from({ length: sessionTotal }).map((_, i) => (
+            <div key={i} className={`h-2 flex-1 rounded-full transition-all duration-300 ${
+              i < total
+                ? (i < score ? 'bg-fun-green' : 'bg-fun-orange')
+                : i === total ? 'bg-primary/40' : 'bg-muted'
+            }`} />
+          ))}
+        </div>
+      </div>
+
       {/* Timer bar */}
       {timerOn && (
         <div className="w-full max-w-md">
