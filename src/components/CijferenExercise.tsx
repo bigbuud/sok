@@ -7,6 +7,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useSound } from '@/hooks/useSound';
 import ScoreDisplay from './ScoreDisplay';
+import { getHintsEnabled } from '@/lib/progress';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -238,11 +239,10 @@ function renderCell(cell: Cell, key: number) {
 interface ColumnDisplayProps {
   rows: Cell[][];
   lineBeforeLastRow?: boolean;
-  lineBeforeRow?: number; // put a line above this row index
+  lineBeforeRow?: number;
 }
 
 const ColumnDisplay = ({ rows, lineBeforeLastRow, lineBeforeRow }: ColumnDisplayProps) => {
-  const numCols = rows[0]?.length ?? 0;
   return (
     <div className="flex flex-col items-center">
       {rows.map((row, ri) => {
@@ -274,11 +274,10 @@ function buildColGrid(
 ): Cell[][] {
   const answer = mode === 'optellen' ? a+b : mode === 'aftrekken' ? a-b : a*b;
   const ansLen = nlen(answer);
-  const numCols = ansLen + 1; // col 0 = operator, col 1..ansLen = digits (left=high, right=ones)
-  const idx = (pos: number) => ansLen - pos; // ones→rightmost col
+  const numCols = ansLen + 1;
+  const idx = (pos: number) => ansLen - pos;
   const op = mode === 'optellen' ? '+' : mode === 'aftrekken' ? '−' : '×';
 
-  // Row 0: carries / borrows
   const rowCarry: Cell[] = Array(numCols).fill(null).map(C.empty);
   carries.forEach((val, pos) => {
     const i = idx(pos);
@@ -287,120 +286,253 @@ function buildColGrid(
     }
   });
 
-  // Row 1: top number (a)
   const rowTop: Cell[] = Array(numCols).fill(null).map(C.empty);
   for (let pos = 0; pos < nlen(a); pos++) rowTop[idx(pos)] = C.digit(dgt(a, pos));
 
-  // Row 2: operator + bottom number (b)
   const rowBot: Cell[] = Array(numCols).fill(null).map(C.empty);
   rowBot[0] = C.op(op);
   for (let pos = 0; pos < nlen(b); pos++) rowBot[idx(pos)] = C.digit(dgt(b, pos));
 
-  // Row 3: answer (child fills in)
   const rowAns: Cell[] = Array(numCols).fill(null).map(C.empty);
   for (let pos = 0; pos < ansLen; pos++) {
-    if (completed.has(pos)) rowAns[idx(pos)] = C.done(completed.get(pos)!);
-    else if (steps[currentStep]?.pos === pos) rowAns[idx(pos)] = C.active();
-    else if (steps.some(s => s.pos === pos)) rowAns[idx(pos)] = C.pend();
+    const i = idx(pos);
+    if (completed.has(pos)) rowAns[i] = C.done(completed.get(pos)!);
+    else if (pos === steps[currentStep]?.pos) rowAns[i] = C.active();
+    else rowAns[i] = C.pend();
   }
 
   return [rowCarry, rowTop, rowBot, rowAns];
 }
 
-// ─── Division display ──────────────────────────────────────────────────────────
+// ─── NEW Dutch-style Division Display ─────────────────────────────────────────
+//
+//   H  T  E
+//   2  3  6 │ 6
+//            ────
+//         3  9
+//
+//   −  1  8
+//   ─────────
+//      5  6
+//   −  5  4
+//   ─────────
+//         2
+//   r =   2
+//
+// ──────────────────────────────────────────────────────────────────────────────
 
 interface DivisionDisplayProps {
   dividend: number;
   divisor: number;
   steps: DivStep[];
-  completedSteps: number; // how many steps child has completed
-  currentQDigit: number | null; // active step's quotient digit (shown as active)
-  quotientDigits: (number | null)[]; // filled-in quotient digits
+  completedSteps: number;
+  quotientDigits: (number | null)[];
 }
 
-const DivisionDisplay = ({
-  dividend, divisor, steps, completedSteps, quotientDigits
-}: DivisionDisplayProps) => {
+const COL_W = 34;  // px per digit column
+const ROW_H = 42;  // px per row
+
+function positionLabel(digits: number): string[] {
+  // Return H/T/E/... labels for a number with `digits` digit count
+  const labels = ['E', 'T', 'H', 'D', 'TT', 'HT'];
+  return Array.from({ length: digits }, (_, i) => labels[digits - 1 - i] ?? '?');
+}
+
+const DivisionDisplay = ({ dividend, divisor, steps, completedSteps, quotientDigits }: DivisionDisplayProps) => {
   const divStr = String(dividend);
+  const divLen = divStr.length;
   const qLen = steps.length;
-  const remainder = steps.length > 0 ? steps[steps.length - 1].remainder : 0;
+  const labels = positionLabel(divLen);
+  const finalRemainder = steps.length > 0 ? steps[steps.length - 1].remainder : 0;
+
+  // Which dividend digits are "active" in the current step
+  const activeUpTo = Math.min(completedSteps, divLen - 1);
 
   return (
-    <div className="font-display select-none" style={{ fontSize: 22 }}>
-      {/* Header: dividend | divisor = quotient */}
-      <div className="flex items-center gap-0 mb-2">
-        {/* Dividend digits — highlight the ones involved in current step */}
-        <div className="flex">
-          {divStr.split('').map((d, i) => {
-            const isActive = i === completedSteps;
-            const isPast = i < completedSteps;
-            return (
-              <div key={i} style={{ width: 36, height: 46 }}
-                className={`flex items-center justify-center font-bold text-2xl ${
-                  isPast ? 'text-muted-foreground' : isActive ? 'text-primary' : 'text-foreground'}`}>
-                {d}
+    <div className="font-display select-none" style={{ fontSize: 20 }}>
+
+      {/* ── Top section: H/T/E + dividend │ divisor ── */}
+      <div className="flex items-stretch">
+
+        {/* Left: labels + dividend */}
+        <div className="flex flex-col">
+          {/* HTE labels row */}
+          <div className="flex mb-0.5">
+            {labels.map((lbl, i) => (
+              <div key={i} style={{ width: COL_W, height: 22 }}
+                className={`flex items-center justify-center text-xs font-bold font-body uppercase tracking-wider ${
+                  i <= activeUpTo ? 'text-fun-green' : 'text-muted-foreground/40'
+                }`}>
+                {lbl}
               </div>
-            );
-          })}
-        </div>
-        {/* Divider bar */}
-        <div className="flex flex-col ml-2">
-          <div className="flex items-center gap-1 border-l-2 border-b-2 border-foreground pl-2 pb-1">
-            <span className="text-muted-foreground text-sm mr-1 font-body">÷</span>
-            <span className="text-xl font-bold">{divisor}</span>
-            <span className="text-muted-foreground mx-2">=</span>
-            {/* Quotient digits */}
-            <div className="flex">
-              {Array.from({ length: qLen }, (_, i) => (
-                <div key={i} style={{ width: 32, height: 36 }}
-                  className={`flex items-center justify-center font-bold text-xl ${
-                    quotientDigits[i] !== null
-                      ? 'text-success'
-                      : i === completedSteps
-                      ? 'text-primary bg-primary/10 rounded border border-primary animate-pulse'
-                      : 'text-muted-foreground/30'
-                  }`}>
-                  {quotientDigits[i] !== null ? quotientDigits[i] : i === completedSteps ? '?' : '·'}
+            ))}
+          </div>
+
+          {/* Arc indicator above active columns */}
+          <div className="flex mb-1" style={{ height: 10 }}>
+            {labels.map((_, i) => {
+              const isInArc = i <= activeUpTo && completedSteps < qLen;
+              return (
+                <div key={i} style={{ width: COL_W, height: 10 }} className="flex items-end justify-center">
+                  {isInArc && (
+                    <svg width={COL_W * (activeUpTo + 1)} height={10}
+                      style={{ position: 'absolute', pointerEvents: 'none' }}
+                      className={i === 0 ? 'block' : 'hidden'}>
+                      <path
+                        d={`M 4,9 Q ${(COL_W * (activeUpTo + 1)) / 2},0 ${COL_W * (activeUpTo + 1) - 4},9`}
+                        fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round"
+                      />
+                    </svg>
+                  )}
                 </div>
-              ))}
-            </div>
+              );
+            })}
+          </div>
+
+          {/* Dividend digits row */}
+          <div className="flex" style={{ height: ROW_H }}>
+            {divStr.split('').map((d, i) => {
+              const isPast = i < completedSteps;
+              const isActive = i === completedSteps && completedSteps < qLen;
+              return (
+                <div key={i} style={{ width: COL_W, height: ROW_H }}
+                  className={`flex items-center justify-center text-2xl font-bold transition-all ${
+                    isPast ? 'text-muted-foreground/50'
+                    : isActive ? 'text-primary'
+                    : 'text-foreground'
+                  }`}>
+                  {d}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Vertical bar + right side (divisor / quotient) */}
+        <div className="flex flex-col ml-1"
+          style={{ borderLeft: '2.5px solid hsl(var(--foreground) / 0.7)', paddingLeft: 8 }}>
+
+          {/* Spacer to align with HTE + arc rows */}
+          <div style={{ height: 22 + 1 + 10 + 1 }} />
+
+          {/* Divisor */}
+          <div style={{ height: ROW_H }}
+            className="flex items-center justify-start">
+            <span className="text-2xl font-bold text-foreground">{divisor}</span>
+          </div>
+
+          {/* Horizontal line under divisor */}
+          <div style={{ height: 2, background: 'hsl(var(--foreground) / 0.7)', marginTop: 2, marginBottom: 4, minWidth: qLen * COL_W + 16 }} />
+
+          {/* Quotient digits */}
+          <div className="flex" style={{ minHeight: ROW_H * 0.85 }}>
+            {Array.from({ length: qLen }, (_, i) => {
+              const filled = quotientDigits[i] !== null;
+              const isActiveQ = i === completedSteps && completedSteps < qLen;
+              return (
+                <div key={i} style={{ width: COL_W, height: ROW_H * 0.85 }}
+                  className={`flex items-center justify-center text-xl font-bold transition-all ${
+                    filled ? 'text-fun-green'
+                    : isActiveQ ? 'text-primary bg-primary/10 rounded-lg border-2 border-primary animate-pulse'
+                    : 'text-muted-foreground/25'
+                  }`}>
+                  {filled ? quotientDigits[i] : isActiveQ ? '?' : '·'}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* Step-by-step subtraction rows */}
-      <div className="flex flex-col gap-0 ml-1">
+      {/* ── Step-by-step subtraction rows ── */}
+      <div className="mt-3 flex flex-col gap-0" style={{ paddingLeft: 4 }}>
         {steps.map((step, i) => {
           if (i > completedSteps) return null;
-          const curStr = String(step.current).padStart(i === 0 ? nlen(step.current) : nlen(step.current), ' ');
-          const prodStr = String(step.product).padStart(nlen(step.current), ' ');
-          const remStr = String(step.remainder);
+
           const isDone = i < completedSteps || (i === completedSteps && quotientDigits[i] !== null);
+
           if (!isDone && i === completedSteps) {
-            // Show current partial dividend, waiting for answer
+            // Show current partial dividend, waiting for quotient digit
             return (
-              <div key={i} className="flex items-baseline gap-1 text-lg font-body text-muted-foreground">
-                <span className="text-primary font-bold">{step.current}</span>
-                <span className="text-xs">← reken nu</span>
+              <div key={i} className="flex items-center gap-2 text-sm font-body text-muted-foreground mb-1">
+                <span className="text-primary font-bold text-lg">{step.current}</span>
+                <span className="text-xs">← vul het quotiëntcijfer in</span>
               </div>
             );
           }
+
+          // Completed step: show full subtraction
+          const curStr = String(step.current);
+          const prodStr = String(step.product);
+          // Align to the same width
+          const maxLen = Math.max(curStr.length, prodStr.length);
+          const colsNeeded = maxLen + 1; // +1 for the − sign
+
+          const remStr = String(step.remainder);
+          const isLast = i === steps.length - 1;
+
           return (
-            <div key={i} className="flex flex-col">
-              <div className="text-muted-foreground text-base">{step.current}</div>
-              <div className="flex items-baseline gap-1 text-base" style={{ borderBottom: '1.5px solid hsl(240 10% 70%)', paddingBottom: 1, marginBottom: 2 }}>
-                <span className="text-fun-orange mr-1">−</span>
-                <span>{step.product}</span>
+            <div key={i} className="flex flex-col" style={{ marginBottom: isLast ? 0 : 2 }}>
+
+              {/* Partial dividend */}
+              <div className="flex items-center" style={{ height: 34 }}>
+                <div style={{ width: COL_W }} />
+                {curStr.split('').map((d, j) => (
+                  <div key={j} style={{ width: COL_W, height: 34 }}
+                    className="flex items-center justify-center text-lg font-bold text-foreground/80">
+                    {d}
+                  </div>
+                ))}
               </div>
-              {i < steps.length - 1 ? (
-                <div className="text-muted-foreground text-sm mb-1">
-                  {step.remainder}
-                  {/* Bring down arrow */}
-                  <span className="text-fun-blue text-xs ml-1">↓{divStr[i + 1]}</span>
+
+              {/* − product */}
+              <div className="flex items-center" style={{ height: 34, borderBottom: '1.5px solid hsl(240 10% 70%)', paddingBottom: 2, marginBottom: 3 }}>
+                <div style={{ width: COL_W }}
+                  className="flex items-center justify-center text-lg font-bold text-fun-pink">
+                  −
+                </div>
+                {/* right-align product under partial dividend */}
+                {Array.from({ length: curStr.length - prodStr.length }, (_, j) => (
+                  <div key={`pad-${j}`} style={{ width: COL_W }} />
+                ))}
+                {prodStr.split('').map((d, j) => (
+                  <div key={j} style={{ width: COL_W, height: 34 }}
+                    className="flex items-center justify-center text-lg font-bold text-foreground">
+                    {d}
+                  </div>
+                ))}
+              </div>
+
+              {/* Remainder / bring-down */}
+              {!isLast ? (
+                <div className="flex items-center gap-1 mb-1" style={{ height: 30 }}>
+                  {/* remainder digits */}
+                  <div style={{ width: COL_W }} />
+                  {step.remainder === 0 ? (
+                    <div style={{ width: COL_W, height: 30 }}
+                      className="flex items-center justify-center text-base font-bold text-muted-foreground">
+                      0
+                    </div>
+                  ) : (
+                    String(step.remainder).split('').map((d, j) => (
+                      <div key={j} style={{ width: COL_W, height: 30 }}
+                        className="flex items-center justify-center text-base font-bold text-muted-foreground">
+                        {d}
+                      </div>
+                    ))
+                  )}
+                  {/* bring-down digit */}
+                  <div className="flex items-center gap-0.5">
+                    <span className="text-fun-blue text-sm font-bold" style={{ marginLeft: 2 }}>
+                      ↓{divStr[i + 1]}
+                    </span>
+                  </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="font-bold text-foreground">{step.remainder}</span>
+                /* Final remainder */
+                <div className="flex items-center mt-1 gap-2">
+                  <div style={{ width: COL_W }} />
+                  <span className="text-xl font-bold text-foreground">{step.remainder}</span>
                   {step.remainder > 0 && (
                     <span className="text-fun-orange text-sm font-body font-bold">(rest)</span>
                   )}
@@ -410,6 +542,15 @@ const DivisionDisplay = ({
           );
         })}
       </div>
+
+      {/* r = remainder */}
+      {completedSteps >= qLen && (
+        <div className="flex items-center gap-3 mt-3 pt-2 border-t border-border">
+          <span className="font-bold text-muted-foreground font-body text-sm underline underline-offset-2">r</span>
+          <span className="font-bold text-muted-foreground">=</span>
+          <span className="text-2xl font-bold text-foreground">{finalRemainder}</span>
+        </div>
+      )}
     </div>
   );
 };
@@ -540,15 +681,15 @@ const ExerciseScreen = ({ mode, diff, sessionTotal, onBack }: ExerciseScreenProp
   const [stepIdx, setStepIdx] = useState(0);
   const [completed, setCompleted] = useState<Map<number, number>>(new Map());
   const [carries, setCarries] = useState<Map<number, number>>(new Map());
-  const [qDigits, setQDigits] = useState<(number | null)[]>([]); // division quotient
+  const [qDigits, setQDigits] = useState<(number | null)[]>([]);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [hadMistake, setHadMistake] = useState(false);
   const [sessionCorrect, setSessionCorrect] = useState(0);
   const [sessionDone, setSessionDone] = useState(0);
   const [phase, setPhase] = useState<'playing' | 'end'>('playing');
+  const hintsEnabled = getHintsEnabled();
   const { playCorrect, playWrong } = useSound();
 
-  // Current hint
   const currentHint = (() => {
     if (problem.mode === 'staartdelen') {
       return (problem.steps as DivStep[])[stepIdx]?.hint ?? '';
@@ -578,7 +719,6 @@ const ExerciseScreen = ({ mode, diff, sessionTotal, onBack }: ExerciseScreenProp
     const steps = problem.steps;
     const isDiv = problem.mode === 'staartdelen';
 
-    // Correct digit?
     const correct = isDiv
       ? d === (steps as DivStep[])[stepIdx].qDigit
       : d === (steps as ColStep[])[stepIdx].digit;
@@ -594,7 +734,6 @@ const ExerciseScreen = ({ mode, diff, sessionTotal, onBack }: ExerciseScreenProp
     playCorrect();
     setFeedback('correct');
 
-    // Update state for this step
     if (isDiv) {
       const newQ = [...qDigits];
       newQ[stepIdx] = d;
@@ -605,7 +744,6 @@ const ExerciseScreen = ({ mode, diff, sessionTotal, onBack }: ExerciseScreenProp
       newCompleted.set(step.pos, d);
       setCompleted(newCompleted);
 
-      // Show carry/borrow for next column
       if (step.carryOrBorrow > 0) {
         const newCarries = new Map(carries);
         newCarries.set(step.pos + 1, step.carryOrBorrow);
@@ -618,7 +756,6 @@ const ExerciseScreen = ({ mode, diff, sessionTotal, onBack }: ExerciseScreenProp
     setTimeout(() => {
       setFeedback(null);
       if (isLast) {
-        // Problem done!
         const newDone = sessionDone + 1;
         const newCorrect = sessionCorrect + (hadMistake ? 0 : 1);
         setSessionDone(newDone);
@@ -639,11 +776,9 @@ const ExerciseScreen = ({ mode, diff, sessionTotal, onBack }: ExerciseScreenProp
   ]);
 
   if (phase === 'end') {
-    return <EndScreen correct={sessionCorrect} total={sessionTotal}
-      onRestart={onBack} />;
+    return <EndScreen correct={sessionCorrect} total={sessionTotal} onRestart={onBack} />;
   }
 
-  // Build column grid for non-division
   const colGrid = problem.mode !== 'staartdelen'
     ? buildColGrid(problem.mode, problem.a, problem.b, problem.steps as ColStep[],
         stepIdx, completed, carries)
@@ -654,12 +789,10 @@ const ExerciseScreen = ({ mode, diff, sessionTotal, onBack }: ExerciseScreenProp
       {/* Top bar */}
       <div className="flex items-center justify-between w-full max-w-md">
         <ScoreDisplay score={sessionCorrect} total={sessionDone} />
-        <div className="flex items-center gap-3">
-          <button onClick={onBack}
-            className="text-xs font-bold font-body text-muted-foreground hover:text-foreground underline underline-offset-2">
-            ⚙️ Instellingen
-          </button>
-        </div>
+        <button onClick={onBack}
+          className="text-xs font-bold font-body text-muted-foreground hover:text-foreground underline underline-offset-2">
+          ⚙️ Instellingen
+        </button>
       </div>
 
       {/* Session progress bar */}
@@ -676,7 +809,7 @@ const ExerciseScreen = ({ mode, diff, sessionTotal, onBack }: ExerciseScreenProp
         </div>
       </div>
 
-      {/* Column display */}
+      {/* Column / Division display */}
       <div className={`bg-card rounded-2xl p-6 shadow-lg w-full max-w-md flex justify-center transition-all ${
         feedback === 'correct' ? 'ring-4 ring-success correct-answer' :
         feedback === 'wrong'   ? 'ring-4 ring-destructive wrong-answer' : ''}`}>
@@ -687,25 +820,26 @@ const ExerciseScreen = ({ mode, diff, sessionTotal, onBack }: ExerciseScreenProp
             <DivisionDisplay
               dividend={(problem as DivisionProblem).dividend}
               divisor={(problem as DivisionProblem).divisor}
-              steps={(problem.steps as DivStep[])}
+              steps={problem.steps as DivStep[]}
               completedSteps={stepIdx}
-              currentQDigit={null}
               quotientDigits={qDigits}
             />
           )
         )}
       </div>
 
-      {/* Hint box */}
-      <div className="w-full max-w-md bg-fun-blue/10 rounded-2xl px-4 py-3 flex items-start gap-2">
-        <span className="text-lg mt-0.5">💡</span>
-        <div>
-          <p className="text-xs font-bold font-body text-fun-blue uppercase tracking-wide mb-0.5">
-            Stap {stepIdx + 1} van {problem.steps.length}
-          </p>
-          <p className="font-body text-sm text-foreground font-bold">{currentHint}</p>
+      {/* Hint box — only shown when hintsEnabled */}
+      {hintsEnabled && (
+        <div className="w-full max-w-md bg-fun-blue/10 rounded-2xl px-4 py-3 flex items-start gap-2">
+          <span className="text-lg mt-0.5">💡</span>
+          <div>
+            <p className="text-xs font-bold font-body text-fun-blue uppercase tracking-wide mb-0.5">
+              Stap {stepIdx + 1} van {problem.steps.length}
+            </p>
+            <p className="font-body text-sm text-foreground font-bold">{currentHint}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* NumPad */}
       <NumPad onDigit={handleDigit} disabled={feedback !== null} />

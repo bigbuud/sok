@@ -39,7 +39,9 @@ function generateProblem(tables: number[], mode: Mode, weakFacts?: WrongFact[]):
     }
   }
   const b = tables[Math.floor(Math.random() * tables.length)];
-  const a = randInt(1, 10);
+  // For 'delen': ensure dividend (a × b) stays below 100
+  const maxA = mode === 'delen' ? Math.min(10, Math.floor(100 / Math.max(b, 1))) : 10;
+  const a = randInt(1, Math.max(1, maxA));
   return makeProblem(a, b, mode);
 }
 
