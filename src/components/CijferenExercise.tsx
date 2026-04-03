@@ -13,6 +13,13 @@ import ScoreDisplay from './ScoreDisplay';
 type CijferenMode = 'optellen' | 'aftrekken' | 'vermenigvuldigen' | 'staartdelen';
 type Difficulty = 1 | 2 | 3;
 
+interface DivisionProblem {
+  mode: 'staartdelen';
+  dividend: number;
+  divisor: number;
+  steps: DivStep[];
+}
+
 function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -678,8 +685,8 @@ const ExerciseScreen = ({ mode, diff, sessionTotal, onBack }: ExerciseScreenProp
         ) : (
           problem.mode === 'staartdelen' && (
             <DivisionDisplay
-              dividend={(problem as any).dividend}
-              divisor={(problem as any).divisor}
+              dividend={(problem as DivisionProblem).dividend}
+              divisor={(problem as DivisionProblem).divisor}
               steps={(problem.steps as DivStep[])}
               completedSteps={stepIdx}
               currentQDigit={null}
