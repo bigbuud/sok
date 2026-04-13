@@ -636,8 +636,8 @@ const ExerciseScreen = ({ mode, diff, sessionTotal, onBack }: {
           <ColumnDisplay rows={colGrid} lineBeforeLastRow />
         ) : problem.mode === 'staartdelen' && (
           <DivisionDisplay
-            dividend={(problem as any).dividend}
-            divisor={(problem as any).divisor}
+            dividend={(problem as { mode: 'staartdelen'; dividend: number; divisor: number; quotient: number; remainder: number; steps: DivStep[] }).dividend}
+            divisor={(problem as { mode: 'staartdelen'; dividend: number; divisor: number; quotient: number; remainder: number; steps: DivStep[] }).divisor}
             steps={problem.steps as DivStep[]}
             completedSteps={stepIdx}
             quotientDigits={qDigits}

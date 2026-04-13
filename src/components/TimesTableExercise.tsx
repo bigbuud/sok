@@ -249,7 +249,7 @@ const ExerciseScreen = ({ tables, mode, timerOn, sessionTotal, onBack, onDone }:
     setTotal(newTotal);
     record(problem.a, problem.b, mode === 'vermenigvuldigen' ? '×' : '÷', isCorrect);
     pendingNextRef.current = { score: newScore, total: newTotal };
-  }, [feedback, problem, mode, score, total, playCorrect, playWrong, nextProblem, record]);
+  }, [feedback, problem, mode, score, total, playCorrect, playWrong, record]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
   const choiceColors = [
