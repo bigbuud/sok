@@ -286,7 +286,6 @@ export default function Index() {
   const earnedBadges = activeProfile.badges;
 
   // Force re-read on tick
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {}, [tick]);
 
   return (
