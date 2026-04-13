@@ -191,7 +191,6 @@ const ExerciseScreen = ({ tables, mode, timerOn, sessionTotal, onBack, onDone }:
   const [motivation, setMotivation] = useState('');
   const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pendingNextRef = useRef<{ score: number; total: number } | null>(null);
 
   const { playCorrect, playWrong } = useSound();
   const { streak, newBadge, clearBadge, record } = useStreakBadges(mode);
@@ -222,7 +221,7 @@ const ExerciseScreen = ({ tables, mode, timerOn, sessionTotal, onBack, onDone }:
           setFeedback('wrong');
           setMotivation('Tijd is op! ⏰');
           record(problem.a, problem.b, '×', false);
-          setTotal(n => { pendingNextRef.current = { score, total: n + 1 }; return n + 1; });
+          setTotal(n => { setTimeout(() => nextProblem(score, n + 1), 1800); return n + 1; });
           return 0;
         }
         return t - 1;
@@ -248,8 +247,8 @@ const ExerciseScreen = ({ tables, mode, timerOn, sessionTotal, onBack, onDone }:
     }
     setTotal(newTotal);
     record(problem.a, problem.b, mode === 'vermenigvuldigen' ? '×' : '÷', isCorrect);
-    pendingNextRef.current = { score: newScore, total: newTotal };
-  }, [feedback, problem, mode, score, total, playCorrect, playWrong, record]); // eslint-disable-line react-hooks/exhaustive-deps
+    setTimeout(() => nextProblem(newScore, newTotal), 1800);
+  }, [feedback, problem, mode, score, total, playCorrect, playWrong, nextProblem, record]);
 
 
   const choiceColors = [
@@ -357,21 +356,6 @@ const ExerciseScreen = ({ tables, mode, timerOn, sessionTotal, onBack, onDone }:
           </button>
         ))}
       </div>
-
-      {/* Volgende button — appears after an answer is given */}
-      {feedback !== null && (
-        <button
-          onClick={() => {
-            const pending = pendingNextRef.current;
-            if (pending) {
-              pendingNextRef.current = null;
-              nextProblem(pending.score, pending.total);
-            }
-          }}
-          className="w-full max-w-xs py-4 rounded-2xl font-bold text-xl bg-fun-green text-white shadow-lg hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0 transition-all">
-          Volgende →
-        </button>
-      )}
 
       {feedback === 'correct' && (
         <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-50">
