@@ -3,7 +3,6 @@ import ScoreDisplay from './ScoreDisplay';
 import { useSound } from '@/hooks/useSound';
 import { useStreakBadges } from '@/hooks/useStreakBadges';
 import { getWeakFacts, type WrongFact } from '@/lib/progress';
-import MultiplicationGrid from './MultiplicationGrid';
 import BadgePopup from './BadgePopup';
 import { Flame, Timer } from 'lucide-react';
 
@@ -330,17 +329,6 @@ const ExerciseScreen = ({ tables, mode, timerOn, sessionTotal, onBack, onDone }:
         </div>
         <p className="text-xs text-muted-foreground font-body mt-3 opacity-60">tafel van {problem.b}</p>
       </div>
-
-      {/* Multiplication grid — only for vermenigvuldigen, only when answer revealed */}
-      {mode === 'vermenigvuldigen' && problem.a <= 10 && problem.b <= 10 && (
-        <div className="w-full max-w-md bg-card rounded-2xl p-4 shadow text-center">
-          <MultiplicationGrid
-            rows={problem.a}
-            cols={problem.b}
-            animate={feedback !== null}
-          />
-        </div>
-      )}
 
       {/* Answer buttons */}
       <div className="grid grid-cols-2 gap-3 w-full max-w-md">
