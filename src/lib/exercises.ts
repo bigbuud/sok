@@ -1,5 +1,6 @@
 export type ExerciseType =
   | 'number-building'
+  | 'splitsingen'
   | 'e-plus-e-brug'
   | 't-min-e-brug'
   | 'te-plus-e-brug'
@@ -21,6 +22,14 @@ export interface ExerciseConfig {
 }
 
 export const exercises: ExerciseConfig[] = [
+  {
+    type: 'splitsingen',
+    title: 'Splitsingen',
+    description: 'Splits getallen van 1 tot 10 in twee delen',
+    emoji: '🍎',
+    colorClass: 'text-fun-pink',
+    bgClass: 'bg-fun-pink/10',
+  },
   {
     type: 'number-building',
     title: 'Getallen bouwen',
