@@ -48,9 +48,59 @@ const TIERS: string[][] = [
   ['vermenigvuldigen', 'delen'],
 ];
 
-// ─── Storage helpers ──────────────────────────────────────────────────────────
+// ─── Storage key ──────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'rekenmeester-v2';
+
+// ─── Server sync ─────────────────────────────────────────────────────────────
+
+let syncTimeout: ReturnType<typeof setTimeout> | null = null;
+
+/** Debounced background sync to server (300ms) */
+function scheduleSyncToServer(state: AppState): void {
+  if (syncTimeout) clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(async () => {
+    try {
+      await fetch('/api/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(state),
+      });
+    } catch {
+      // Silently fail — localStorage remains the local cache
+    }
+  }, 300);
+}
+
+/**
+ * Call once on app boot (e.g. in main.tsx).
+ * Fetches server state and merges it into localStorage if it's newer/more complete.
+ */
+export async function initState(): Promise<void> {
+  try {
+    const res = await fetch('/api/state');
+    if (!res.ok) return;
+    const serverState: AppState | null = await res.json();
+    if (!serverState || !Array.isArray(serverState.profiles) || serverState.profiles.length === 0) return;
+
+    // Compare with local: keep the one with more total progress
+    const localRaw = localStorage.getItem(STORAGE_KEY);
+    if (localRaw) {
+      const local: AppState = JSON.parse(localRaw);
+      const serverTotal = serverState.profiles.reduce((s, p) => s + p.totalCorrect, 0);
+      const localTotal  = local.profiles.reduce((s, p) => s + p.totalCorrect, 0);
+      if (serverTotal >= localTotal) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(serverState));
+      }
+    } else {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serverState));
+    }
+  } catch {
+    // No server (dev mode / offline) — fall back to localStorage only
+  }
+}
+
+// ─── Storage helpers ──────────────────────────────────────────────────────────
 
 function makeProfile(name: string, avatar: string): Profile {
   return {
@@ -114,6 +164,7 @@ export function loadState(): AppState {
 export function saveState(state: AppState): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    scheduleSyncToServer(state);   // ← background sync naar server
   } catch {
     // Silently fail
   }
@@ -145,7 +196,7 @@ export function createProfile(name: string, avatar: string): Profile {
 
 export function deleteProfile(id: string): void {
   const state = loadState();
-  if (state.profiles.length <= 1) return; // keep at least one
+  if (state.profiles.length <= 1) return;
   state.profiles = state.profiles.filter(p => p.id !== id);
   if (state.activeProfileId === id) {
     state.activeProfileId = state.profiles[0].id;
