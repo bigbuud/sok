@@ -1,20 +1,25 @@
+# ── Stage 1: build frontend ──────────────────────────────────────────────────
 FROM node:20-alpine AS build
 WORKDIR /app
-
-# Copy package files
 COPY package*.json ./
-
-# Install dependencies
 RUN npm install
-
-# Copy application files
 COPY . .
-
-# Build the application
 RUN npm run build
 
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# ── Stage 2: production server ───────────────────────────────────────────────
+FROM node:20-alpine
+WORKDIR /app
+
+# Install only production deps (express + better-sqlite3)
+COPY package*.json ./
+RUN npm install --omit=dev
+
+# Copy built frontend and server
+COPY --from=build /app/dist ./dist
+COPY server ./server
+
+# Data volume for SQLite
+VOLUME ["/data"]
+
+EXPOSE 3000
+CMD ["node", "server/index.js"]

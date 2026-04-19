@@ -3,7 +3,15 @@ version: '3.8'
 services:
   sok:
     build: .
-    image: bigbuud/sok:latest
+    image: ghcr.io/bigbuud/sok:latest
     ports:
-      - "3000:80"
+      - "3000:3000"
+    volumes:
+      - sok_data:/data
     restart: unless-stopped
+    environment:
+      - DB_PATH=/data/sok.db
+      - PORT=3000
+
+volumes:
+  sok_data:
