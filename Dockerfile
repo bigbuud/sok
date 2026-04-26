@@ -22,4 +22,4 @@ COPY server ./server
 VOLUME ["/data"]
 
 EXPOSE 3000
-CMD ["node", "server/index.js"]
+CMD ["node", "server/index.cjs"]
