@@ -1,20 +1,11 @@
 # SOK — Reken oefeningen app
-
 Een interactieve web-app voor rekenoefeningen, gebouwd met React + Vite.
 
 ---
 
 ## 🚀 Installatie op NAS (Docker)
 
-**1. Maak een mapje aan op je NAS**
-
-```bash
-mkdir -p /volume1/docker/sok/logs
-```
-
-> QNAP: gebruik `/share/Container/sok/logs`
-
-**2. Maak een `docker-compose.yml` aan**
+**1. Maak een `docker-compose.yml` aan**
 
 ```yaml
 services:
@@ -23,14 +14,21 @@ services:
     container_name: sok
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "3000:3000"
     volumes:
-      - /volume1/docker/sok/logs:/var/log/nginx
+      - sok_data:/data
     environment:
+      - DB_PATH=/data/sok.db
+      - PORT=3000
       - TZ=Europe/Brussels
+
+volumes:
+  sok_data:
 ```
 
-**3. Start de app**
+> Wil je een andere poort? Pas de linkerkant aan, bv. `5505:3000`.
+
+**2. Start de app**
 
 ```bash
 docker-compose up -d
