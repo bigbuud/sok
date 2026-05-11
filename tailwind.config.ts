@@ -15,7 +15,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["'Fredoka One'", "cursive"],
+        display: ["'Baloo 2'", "cursive"],
         body: ["'Nunito'", "sans-serif"],
       },
       colors: {
