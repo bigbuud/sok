@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import ScoreDisplay from './ScoreDisplay';
 import { useSound } from '@/hooks/useSound';
+import { recordAnswer, checkNewBadges, loadProgress } from '@/lib/progress';
 
 // ─── Per-number color + monster config (matching the splitskaarten PDF) ────────
 
@@ -319,7 +320,7 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
 
 // ─── End screen ──────────────────────────────────────────────────────────────
 
-function EndScreen({ score, total, onRestart }: { score: number; total: number; onRestart: () => void }) {
+function EndScreen({ score, total, newBadges, onRestart }: { score: number; total: number; newBadges: string[]; onRestart: () => void }) {
   const pct = Math.round((score / total) * 100);
   const { emoji, msg, color } =
     pct === 100 ? { emoji: '🏆', msg: 'Perfect! Alles juist!', color: 'text-fun-yellow' }
@@ -352,6 +353,16 @@ function EndScreen({ score, total, onRestart }: { score: number; total: number; 
             <span className="font-display text-3xl text-foreground">{pct}%</span>
           </div>
         </div>
+        {newBadges.length > 0 && (
+          <div className="mb-4 p-3 rounded-2xl bg-fun-yellow/20 border-2 border-fun-yellow">
+            <p className="font-body font-bold text-sm text-foreground mb-2">🏅 Nieuwe badge{newBadges.length > 1 ? 's' : ''} verdiend!</p>
+            <div className="flex gap-3 justify-center flex-wrap">
+              {newBadges.map(id => (
+                <span key={id} className="text-3xl">{'🌟🎯🔥🚀💎'.split('')[['eerste-5','perfecte-10','op-dreef','raket','diamant'].indexOf(id)]}</span>
+              ))}
+            </div>
+          </div>
+        )}
         <button onClick={onRestart}
           className="w-full py-4 rounded-2xl font-display text-xl bg-primary text-white hover:opacity-90 active:scale-95 transition-all shadow-lg">
           🔄 Opnieuw spelen
@@ -436,6 +447,8 @@ export default function SplitsingenExercise() {
   const { playCorrect, playWrong } = useSound();
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerSeconds = timerMode === '5' ? 5 : 10;
+  const [streak, setStreak] = useState(0);
+  const [newBadges, setNewBadges] = useState<string[]>([]);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -472,6 +485,8 @@ export default function SplitsingenExercise() {
           setFeedback('timeout');
           setRevealed(true);
           playWrong();
+          recordAnswer('splitsingen', prev, 0, 'splitsingen', false);
+          setStreak(0);
           advance(false, roundLength, timerSeconds);
           return 0;
         }
@@ -487,14 +502,25 @@ export default function SplitsingenExercise() {
     clearTimer();
     const isCorrect = chosen === problem.part2;
     if (isCorrect) { setScore(s => s + 1); playCorrect(); } else { playWrong(); }
+    recordAnswer('splitsingen', problem.total, problem.part1, 'splitsingen', isCorrect);
+    setStreak(s => isCorrect ? s + 1 : 0);
     setFeedback(isCorrect ? 'correct' : 'wrong');
     setRevealed(true);
     advance(isCorrect, roundLength, timerSeconds);
   }, [feedback, problem, clearTimer, playCorrect, playWrong, advance, roundLength, timerSeconds]);
 
+  useEffect(() => {
+    if (phase === 'done') {
+      const progress = loadProgress();
+      const earned = checkNewBadges(progress, score, roundLength, streak);
+      if (earned.length > 0) setNewBadges(earned);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
   const handleStart = (round: RoundLength, timer: TimerMode) => {
     setRoundLength(round); setTimerMode(timer);
-    setScore(0); setQuestionsDone(0);
+    setScore(0); setQuestionsDone(0); setStreak(0); setNewBadges([]);
     setFeedback(null); setRevealed(false);
     setProblem(generateProblem());
     setTimeLeft(timer === '5' ? 5 : 10);
@@ -502,7 +528,7 @@ export default function SplitsingenExercise() {
   };
 
   if (phase === 'setup') return <SetupScreen onStart={handleStart} />;
-  if (phase === 'done') return <EndScreen score={score} total={roundLength} onRestart={() => setPhase('setup')} />;
+  if (phase === 'done') return <EndScreen score={score} total={roundLength} newBadges={newBadges} onRestart={() => setPhase('setup')} />;
 
   const theme = NUMBER_THEME[problem.total] ?? NUMBER_THEME[10];
 
